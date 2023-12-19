@@ -10,12 +10,11 @@ sampling:
   batch_size: 1000
   step_lr: 0.0000062
   n_steps_each: 5
-  ckpt_id: 30000
+  ckpt_id: 50000
   final_only: true
   fid: true
   denoise: true
   num_samples4fid: 5000
-  n_interpolations: 15
 
 data:
   dataset: "MNIST"
