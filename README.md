@@ -1,4 +1,4 @@
-# Probabilistic-Graphical-Models-Project
+# Denoising Score Matching matching for Diffusion Models
 
 This repository contains all the codes and scripts necessary to replicate the experiments and concepts discussed in our project report for the 2023/2024 M2 MVA course "Probabilistic Graphical Models and Deep Generative Models".
 
