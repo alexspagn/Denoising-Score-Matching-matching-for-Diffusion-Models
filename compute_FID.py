@@ -2,6 +2,10 @@ import torch
 from pytorch_fid.fid_score import calculate_fid_given_paths
 import os
 
+#########################################################################################################################
+# In this script we use the PyTorch FID_score function, we compute the FID between the original dataset and the samples #
+#########################################################################################################################
+
 def calculate_fid(relative_path1, relative_path2):
     # Get the absolute paths based on the current working directory
     base_path = os.getcwd()
@@ -17,9 +21,9 @@ def calculate_fid(relative_path1, relative_path2):
     return fid_value
 
 if __name__ == '__main__':
-    # Define the relative paths to the image folders
-    relative_path_to_folder1 = 'exp/image_samples/MNIST_geom_samples'
-    relative_path_to_folder2 = 'MNIST_FID/testSet'
+    # Define the relative paths to the image folders. The folders must contain single image files
+    relative_path_to_folder1 = 'exp/image_samples/Car_sigmoid_samples'
+    relative_path_to_folder2 = 'exp/datasets/car'
 
     # Calculate FID
     fid_score = calculate_fid(relative_path_to_folder1, relative_path_to_folder2)

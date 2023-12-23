@@ -3,6 +3,9 @@ from . import get_sigmas
 from .layers import *
 from .normalization import get_normalization
 
+#################################################################################################################################
+# In this script we define the NCSNv2 model, which uses layers and blocks defined in the layers.py and normalization.py scripts #
+#################################################################################################################################
 
 class NCSNv2(nn.Module):
     def __init__(self, config):

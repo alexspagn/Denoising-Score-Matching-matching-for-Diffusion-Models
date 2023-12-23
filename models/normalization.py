@@ -1,7 +1,11 @@
 import torch
 import torch.nn as nn
 
+##############################################################
+# In this script we define the possible normalization layers #
+##############################################################
 
+# Here we choose which normalization we want to use, as chosen in the config file
 def get_normalization(config):
     norm = config.model.normalization
     if norm == 'BatchNorm':
@@ -20,7 +24,7 @@ def get_normalization(config):
         raise NotImplementedError("{} does not exist!".format(norm))
 
 
-
+# Here we define all the different normalization techniques (as layers) that are not already included in PyTorch
 class VarianceNorm2d(nn.Module):
     def __init__(self, num_features, bias=False):
         super().__init__()

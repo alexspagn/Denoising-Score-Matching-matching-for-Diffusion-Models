@@ -1,5 +1,10 @@
 import torch
 
+##################################################
+# In this script we define the DSM loss function #
+##################################################
+
+# If no specific level of noise has been chosen (label variable), we randomly select which level of noise we want to train
 def anneal_dsm_score_estimation(scorenet, samples, sigmas, labels=None, anneal_power=2.):
     if labels is None:
         labels = torch.randint(0, len(sigmas), (samples.shape[0],), device=samples.device)

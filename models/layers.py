@@ -1,11 +1,14 @@
 import torch.nn as nn
 import torch
-from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 from .normalization import *
 from functools import partial
 
+################################################################
+# In this script we define the layers used in the NCSNv2 model #
+################################################################
 
+# Here we define the function that selects the chosen activation function among the possible ones
 def get_act(config):
     if config.model.nonlinearity.lower() == 'elu':
         return nn.ELU()
@@ -19,6 +22,9 @@ def get_act(config):
         return swish
     else:
         raise NotImplementedError('activation function does not exist!')
+
+
+# From here, we define all the layers and blocks that are used in the NCSNv2 model
 
 def conv1x1(in_planes, out_planes, stride=1, bias=True):
     "1x1 convolution"

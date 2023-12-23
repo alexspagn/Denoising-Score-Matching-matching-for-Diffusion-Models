@@ -1,5 +1,5 @@
 training:
-  batch_size: 256
+  batch_size: 64
   n_epochs: 500000
   n_iters: 300001
   snapshot_freq: 5000
@@ -10,31 +10,31 @@ sampling:
   batch_size: 1000
   step_lr: 0.0000062
   n_steps_each: 5
-  ckpt_id: 50000
+  ckpt_id: 100000
   final_only: true
   fid: true
   denoise: true
   num_samples4fid: 10000
 
 data:
-  dataset: "MNIST"
-  image_size: 28
-  channels: 1
+  dataset: "CAR"
+  image_size: 32
+  channels: 3
   logit_transform: false
-  random_flip: false
+  random_flip: true
   rescaled: false
   num_workers: 4
 
 model:
-  sigma_begin: 1
+  sigma_begin: 50
   num_classes: 200
   ema: true
   ema_rate: 0.999
-  sigma_dist: geometric
+  sigma_dist: sigmoid
   sigma_end: 0.01
   normalization: InstanceNorm++
   nonlinearity: elu
-  ngf: 64
+  ngf: 128
 
 optim:
   weight_decay: 0.000

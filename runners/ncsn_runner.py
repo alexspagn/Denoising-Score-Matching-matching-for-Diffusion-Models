@@ -17,11 +17,16 @@ from models.ema import EMAHelper
 
 __all__ = ['NCSNRunner']
 
+#################################################################
+# In this script we define the training and sampling procedures #
+#################################################################
 
+# Here we get the model from the NCSNv2 class
 def get_model(config):
-    if config.data.dataset == 'CIFAR10' or config.data.dataset == 'CELEBA' or config.data.dataset == 'MNIST':
+    if config.data.dataset == 'CIFAR10' or config.data.dataset == 'CELEBA' or config.data.dataset == 'MNIST' or config.data.dataset == 'CAR':
         return NCSNv2(config).to(config.device)
 
+# This is the RUnner class, with all the procedures inside as methods
 class NCSNRunner():
     def __init__(self, args, config):
         self.args = args
@@ -29,7 +34,9 @@ class NCSNRunner():
         args.log_sample_path = os.path.join(args.log_path, 'samples')
         os.makedirs(args.log_sample_path, exist_ok=True)
 
+    # Train procedure
     def train(self):
+        # Dataset loading
         dataset, test_dataset = get_dataset(self.args, self.config)
         dataloader = DataLoader(dataset, batch_size=self.config.training.batch_size, shuffle=True,
                                 num_workers=self.config.data.num_workers)
@@ -40,18 +47,23 @@ class NCSNRunner():
 
         tb_logger = self.config.tb_logger
 
+        # We define the score NN as the NCSNv2 model
         score = get_model(self.config)
 
         score = torch.nn.DataParallel(score)
+
+        # Depending on the configurations, we get the right optimizer chosen
         optimizer = get_optimizer(self.config, score.parameters())
 
         start_epoch = 0
         step = 0
 
+        # We initialize the EMA (exponential moving average) for slowly upgrading the weights of the NN, ensuring more stability
         if self.config.model.ema:
             ema_helper = EMAHelper(mu=self.config.model.ema_rate)
             ema_helper.register(score)
 
+        # Whether to resume training
         if self.args.resume_training:
             states = torch.load(os.path.join(self.args.log_path, 'checkpoint.pth'))
             score.load_state_dict(states[0])
@@ -63,8 +75,10 @@ class NCSNRunner():
             if self.config.model.ema:
                 ema_helper.load_state_dict(states[4])
 
+        # Get the sigmas from the chosen schedule
         sigmas = get_sigmas(self.config)
 
+        # Training loop
         for epoch in range(start_epoch, self.config.training.n_epochs):
             for i, (X, y) in enumerate(dataloader):
                 score.train()
@@ -73,12 +87,14 @@ class NCSNRunner():
                 X = X.to(self.config.device)
                 X = data_transform(self.config, X)
 
+                # We compute the dsm loss as defined in the report
                 loss = anneal_dsm_score_estimation(score, X, sigmas, None,
                                                    self.config.training.anneal_power)
                 tb_logger.add_scalar('loss', loss, global_step=step)
 
                 logging.info("step: {}, loss: {}".format(step, loss.item()))
 
+                # Do an optimizer step
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -89,6 +105,7 @@ class NCSNRunner():
                 if step >= self.config.training.n_iters:
                     return 0
 
+                # every 100 steps we compute the loss on the test dataset
                 if step % 100 == 0:
                     if self.config.model.ema:
                         test_score = ema_helper.ema_copy(score)
@@ -114,6 +131,7 @@ class NCSNRunner():
 
                         del test_score
 
+                # At a chosen frequency we save a chekpoint of the model and sample from it
                 if step % self.config.training.snapshot_freq == 0:
                     states = [
                         score.state_dict(),
@@ -127,6 +145,7 @@ class NCSNRunner():
                     torch.save(states, os.path.join(self.args.log_path, 'checkpoint_{}.pth'.format(step)))
                     torch.save(states, os.path.join(self.args.log_path, 'checkpoint.pth'))
 
+                    # Sampling procedure
                     if self.config.training.snapshot_sampling:
                         if self.config.model.ema:
                             test_score = ema_helper.ema_copy(score)
@@ -135,19 +154,19 @@ class NCSNRunner():
 
                         test_score.eval()
 
-                        ## Different part from NeurIPS 2019.
-                        ## Random state will be affected because of sampling during training time.
                         init_samples = torch.rand(36, self.config.data.channels,
                                                   self.config.data.image_size, self.config.data.image_size,
                                                   device=self.config.device)
                         init_samples = data_transform(self.config, init_samples)
 
+                        # Start the Annealed Langeving procedure
                         all_samples = anneal_Langevin_dynamics(init_samples, test_score, sigmas.cpu().numpy(),
                                                                self.config.sampling.n_steps_each,
                                                                self.config.sampling.step_lr,
                                                                final_only=True, verbose=True,
                                                                denoise=self.config.sampling.denoise)
 
+                        # We resize and transform the samplesin order to visualize them
                         sample = all_samples[-1].view(all_samples[-1].shape[0], self.config.data.channels,
                                                       self.config.data.image_size,
                                                       self.config.data.image_size)
@@ -162,6 +181,7 @@ class NCSNRunner():
                         del test_score
                         del all_samples
 
+    # Samplig procedure from a checkpoint chosen
     def sample(self):
         if self.config.sampling.ckpt_id is None:
             states = torch.load(os.path.join(self.args.log_path, 'checkpoint.pth'), map_location=self.config.device)
@@ -169,33 +189,33 @@ class NCSNRunner():
             states = torch.load(os.path.join(self.args.log_path, f'checkpoint_{self.config.sampling.ckpt_id}.pth'),
                                 map_location=self.config.device)
 
+        # Define the Score NN and set the weights loaded from the checkpoint
         score = get_model(self.config)
         score = torch.nn.DataParallel(score)
 
         score.load_state_dict(states[0], strict=True)
-
+        
+        # Load the EMA as well from the checkpoint
         if self.config.model.ema:
             ema_helper = EMAHelper(mu=self.config.model.ema_rate)
             ema_helper.register(score)
             ema_helper.load_state_dict(states[-1])
             ema_helper.ema(score)
 
+        # Get the chosen schedule
         sigmas_th = get_sigmas(self.config)
         sigmas = sigmas_th.cpu().numpy()
 
-        dataset, _ = get_dataset(self.args, self.config)
-        dataloader = DataLoader(dataset, batch_size=self.config.sampling.batch_size, shuffle=True,
-                                num_workers=4)
-
         score.eval()
 
-        # We can sample in order to compute the FID or just to produce grid of images
+        # We can sample in order to compute samples as single images for the FID computation or just to produce a grid of images
         if not self.config.sampling.fid:
             init_samples = torch.rand(self.config.sampling.batch_size, self.config.data.channels,
                                         self.config.data.image_size, self.config.data.image_size,
                                         device=self.config.device)
             init_samples = data_transform(self.config, init_samples)
 
+            # Start the Annealed Langeving procedure
             all_samples = anneal_Langevin_dynamics(init_samples, score, sigmas,
                                                     self.config.sampling.n_steps_each,
                                                     self.config.sampling.step_lr, verbose=True,
@@ -239,7 +259,8 @@ class NCSNRunner():
                                         self.config.data.image_size,
                                         self.config.data.image_size, device=self.config.device)
                 samples = data_transform(self.config, samples)
-
+                
+                # Start the Annealed Langeving procedure
                 all_samples = anneal_Langevin_dynamics(samples, score, sigmas,
                                                        self.config.sampling.n_steps_each,
                                                        self.config.sampling.step_lr, verbose=False,

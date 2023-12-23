@@ -13,6 +13,21 @@ from runners import *
 
 import os
 
+#############################################################################################################
+# This is the main script, from which we can choose which procedure (training or sampling) we want to start #
+# and which configuration file we want to choose.                                                           #
+#############################################################################################################
+
+# Training example:
+# python main.py --config car.yml --doc Car_geom
+#
+# or, to resume a training:
+# python main.py --config car.yml --doc Car_geom --resume_training
+
+# Sampling example:
+# python main.py --sample --config CAR.yml --doc Car_sigmoid -i Car_sigmoid_samples
+
+# Function to parse the arguments
 def parse_args_and_config():
     parser = argparse.ArgumentParser(description=globals()['__doc__'])
 
@@ -37,6 +52,7 @@ def parse_args_and_config():
 
     tb_path = os.path.join(args.exp, 'tensorboard', args.doc)
 
+    # This code differentiate between sampling and training procedure, allowing also to resume the training
     if not args.sample:
         if not args.resume_training:
             if os.path.exists(args.log_path):
@@ -105,13 +121,13 @@ def parse_args_and_config():
                 print("Output image folder exists. Program halted.")
                 sys.exit(0)
 
-    # add device
+    # Add device
     device = torch.device('cuda:0') #if torch.cuda.is_available() else torch.device('cpu')
     print(device)
     logging.info("Using device: {}".format(device))
     new_config.device = device
 
-    # set random seed
+    # Set random seed
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     if torch.cuda.is_available():
@@ -121,7 +137,7 @@ def parse_args_and_config():
 
     return args, new_config
 
-
+# These function is a utils to convert from dict entries to namespace object
 def dict2namespace(config):
     namespace = argparse.Namespace()
     for key, value in config.items():
@@ -146,6 +162,7 @@ def main():
     print(yaml.dump(config_dict, default_flow_style=False))
     print("<" * 80)
 
+    # Start the Runner with the right procedure
     try:
         runner = NCSNRunner(args, config)
         if args.sample:

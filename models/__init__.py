@@ -1,6 +1,14 @@
 import torch
 import numpy as np
 
+############################################################################################
+# In this script we define the loss schedules and the Annealed Langevin Dynamics algorithm #
+############################################################################################
+
+# Here we define all the noise schedules that we will use
+def sigmoid(x):
+    return -1 / (1 + np.exp(-x))
+
 def get_sigmas(config):
     if config.model.sigma_dist == 'geometric':
         sigmas = torch.tensor(
@@ -20,17 +28,25 @@ def get_sigmas(config):
         sigmas = torch.tensor(
                             config.model.sigma_begin * np.cos((np.linspace(0, 1,
                                                config.model.num_classes) / 1.068) * np.pi / 2) ** 2).float().to(config.device)
+    elif config.model.sigma_dist == 'sigmoid':
+        sigmas = torch.tensor(
+                 (sigmoid(np.linspace(0, 10, config.model.num_classes) - 2.5) + 1.0013)).float()
+        sigmas = sigmas - 0.09012*sigmas.max()/config.model.sigma_begin
+        sigmas = config.model.sigma_begin * sigmas / sigmas.max()
+        sigmas = sigmas.to(config.device)
     else:
         raise NotImplementedError('sigma distribution not supported')
 
     return sigmas
 
+# Here we define the Annelaed Langevin Dynamics algorithm (Algorithm 1 in the Report)
 @torch.no_grad()
 def anneal_Langevin_dynamics(x_mod, scorenet, sigmas, n_steps_each=200, step_lr=0.000008,
                              final_only=False, verbose=False, denoise=True):
     images = []
 
     with torch.no_grad():
+        # For every sigma, for a given number of steps for each one, we compute the score and use it in the Langevin equation
         for c, sigma in enumerate(sigmas):
             labels = torch.ones(x_mod.shape[0], device=x_mod.device) * c
             labels = labels.long()

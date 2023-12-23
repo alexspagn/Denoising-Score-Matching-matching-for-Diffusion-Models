@@ -2,7 +2,14 @@ import os
 import torch
 import torchvision.transforms as transforms
 from torchvision.datasets import MNIST, CIFAR10
+from datasets.car import Car
 
+########################################################################
+# In this script we define the functions needed to import the datasets #
+########################################################################
+
+# Here we define the function to get the chosen dataset, importing it applying the right transformations needed to ensure
+# that the images have all the same size and, if we allow it in the config file, we randomly horizontally flip them.
 def get_dataset(args, config):
     if config.data.random_flip is False:
         tran_transform = test_transform = transforms.Compose([
@@ -32,8 +39,13 @@ def get_dataset(args, config):
             test_dataset = MNIST(os.path.join(args.exp, 'datasets', 'mnist_test'), train=False, download=True,
                                  transform=test_transform)
             
+    elif config.data.dataset == 'CAR':
+            dataset = Car(os.path.join(args.exp, 'datasets', 'car'), transform=tran_transform)
+            test_dataset = Car(os.path.join(args.exp, 'datasets', 'car_test'), transform=test_transform)
+            
     return dataset, test_dataset
 
+# These functions are utilities for transforming the data through the logit map
 def logit_transform(image, lam=1e-6):
     image = lam + (1 - 2 * lam) * image
     return torch.log(image) - torch.log1p(-image)
